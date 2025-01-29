@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include <stdio.h>
 #include "math.h"
 
 #define TO_RADIANS(degrees) (degrees * (3.14159f / 180.0f))
@@ -27,9 +28,15 @@ typedef struct {
     int data[8][8];
 } World;
 
+typedef enum {
+    MINIMAP,
+    FPS,
+} renderer_t;
+
 typedef struct {
-    
+   renderer_t type; 
 } Renderer;
+
 
 Player player_new() {
     Player player = {
@@ -43,30 +50,40 @@ Player player_new() {
     return player;
 }
 
-void player_input_update(Player *player) {
+void player_input_update(Player *self, Renderer *renderer) {
     if (IsKeyDown('W') == 1) {
-        player->pos.x += cos(TO_RADIANS(player->angle)) * player-> velocity; 
-        player->pos.y += sin(TO_RADIANS(player->angle)) * player-> velocity; 
+        self->pos.x += cos(TO_RADIANS(self->angle)) * self-> velocity; 
+        self->pos.y += sin(TO_RADIANS(self->angle)) * self-> velocity; 
     
     }
     if (IsKeyDown('A') == 1) {
 
-       player->angle -= 10.0f; 
+       self->angle -= 10.0f; 
     }
     if (IsKeyDown('S') == 1) {
-        player->pos.x -= cos(TO_RADIANS(player->angle)) * player-> velocity; 
-        player->pos.y -= sin(TO_RADIANS(player->angle)) * player-> velocity; 
+        self->pos.x -= cos(TO_RADIANS(self->angle)) * self-> velocity; 
+        self->pos.y -= sin(TO_RADIANS(self->angle)) * self-> velocity; 
 
     }
     if (IsKeyDown('D') == 1) {
-       player->angle += 10.0f; 
+       self->angle += 10.0f; 
     }
 
-    if (player->angle >= 360.0f) {
-        player->angle -= 360.0f;
+    // Printf's don't work here for some reason?
+    if (IsKeyDown('U') == 1) {
+        renderer->type = MINIMAP; 
+        printf("Hello?");
     }
-    if (player->angle < 0.0f) {
-        player->angle += 360.0f;
+    if (IsKeyDown('I') == 1) {
+        renderer->type = FPS; 
+    }
+
+
+    if (self->angle >= 360.0f) {
+        self->angle -= 360.0f;
+    }
+    if (self->angle < 0.0f) {
+        self->angle += 360.0f;
     }
 }
 
@@ -256,7 +273,7 @@ void raycast_fov(Player *self, Vector2 pos, float angle, int num_rays, Tuple_Ret
 
 }
 
-void render_player(Player *self, int num_rays) {
+void render_minimap(Player *self, int num_rays) {
     DrawCircle(self->pos.x, self->pos.y, 5.0, BLUE);
 
     Vector2 start_pos = {self->pos.x, self->pos.y};
@@ -279,6 +296,9 @@ void render_player(Player *self, int num_rays) {
     }
 }
 
+void render_fps(Player *self, int num_rays) {
+    
+}
 
 void render_world(World *world) {  
     for (int i=0; i < world->map_size; i++) {
@@ -311,29 +331,48 @@ World world_new(int world_size, int tile_size) {
     return world;
 }
 
+Renderer renderer_new() {
+    Renderer renderer = {
+        MINIMAP,
+    };
+    return renderer;
+}
+
+void render(Renderer *self, Player *player, int num_rays, World *world) {
+        raycast_fov(player, player->pos, player->angle, num_rays, player->positions, world);
+
+    switch (self->type) {
+        case MINIMAP:
+            render_world(world);
+            render_minimap(player, num_rays);
+        case FPS:
+            render_fps(player, num_rays);
+    }
+}
+
+
 int main() {
     // Initialize window
     InitWindow(screen_width, screen_height, "Raycaster in C");
 
     World world = world_new(8, 64);
     Player player = player_new();
+    Renderer renderer = renderer_new();
 
     int num_rays = 60;
 
     // Low fps cuz this hurts my rasberry pi rn
-    SetTargetFPS(15);
+    SetTargetFPS(20);
 
         while (!WindowShouldClose()) {
-        player_input_update(&player);
-        // Start drawing
-        BeginDrawing();
-        ClearBackground(RAYWHITE);
+            player_input_update(&player, &renderer);
+            // Start drawing
+            BeginDrawing();
+            ClearBackground(RAYWHITE);
 
-        raycast_fov(&player, player.pos, player.angle, num_rays, player.positions, &world);
-        render_world(&world);
-        render_player(&player, 60);
-        
-        EndDrawing();
+            render(&renderer, &player, num_rays, &world);
+                
+            EndDrawing();
     }
 
     // Close window
