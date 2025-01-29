@@ -296,8 +296,18 @@ void render_minimap(Player *self, int num_rays) {
     }
 }
 
-void render_fps(Player *self, int num_rays) {
-    
+void render_fps(Player *self, int num_rays, World *world) {
+   
+    float column_width = (screen_width /  num_rays);
+
+    for (int i = 0; i < num_rays; i++) {
+        float wall_height = (screen_height * world->tile_size) / self->positions[i].distance;
+        float y = (screen_height - wall_height) / 2.0;
+        float x = i * column_width;
+        float height = wall_height;
+
+        DrawRectangle(x,y, column_width, height, BLUE);
+    }
 }
 
 void render_world(World *world) {  
@@ -307,15 +317,15 @@ void render_world(World *world) {
             if (world->data[i][j] == 1) {
                 color = BLACK;
             }
-            DrawRectangle(i * world->tile_size, j * world->tile_size, 64 - 1, 64 - 1, color);
+            DrawRectangle(i * world->tile_size, j * world->tile_size, world->tile_size , world->tile_size, color);
             }
         }
 }
 
 World world_new(int world_size, int tile_size) {
     World world = {
-        8,
-        64,
+        world_size,
+        tile_size,
         .data = {
             {1,1,1,1,1,1,1,1},
             {1,0,0,0,0,0,0,1},
@@ -341,13 +351,13 @@ Renderer renderer_new() {
 void render(Renderer *self, Player *player, int num_rays, World *world) {
         raycast_fov(player, player->pos, player->angle, num_rays, player->positions, world);
 
-    switch (self->type) {
-        case MINIMAP:
+        if (self->type == MINIMAP) {
             render_world(world);
             render_minimap(player, num_rays);
-        case FPS:
-            render_fps(player, num_rays);
-    }
+        }
+        if (self->type == FPS) {
+            render_fps(player, num_rays, world);
+        }
 }
 
 
@@ -355,7 +365,7 @@ int main() {
     // Initialize window
     InitWindow(screen_width, screen_height, "Raycaster in C");
 
-    World world = world_new(8, 64);
+    World world = world_new(8, screen_width / 8);
     Player player = player_new();
     Renderer renderer = renderer_new();
 
