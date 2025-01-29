@@ -8,11 +8,17 @@
 
 const int screen_width = 512;
 const int screen_height = 512;
+// C doesn't have tuples so I'm doing this as a return value for the raycast function
+typedef struct {
+    float distance;
+    Vector2 hit_point;
+} Tuple_Return;
 
 typedef struct {
     Vector2 pos;
     float velocity;
     float angle;
+    Tuple_Return positions[100];
 } Player;
 
 typedef struct {
@@ -21,13 +27,17 @@ typedef struct {
     int data[8][8];
 } World;
 
+typedef struct {
+    
+} Renderer;
+
 Player player_new() {
     Player player = {
         {
             200.0f,
             200.0f,
         },
-        2.0f,
+        20.0f,
         0.0f,
     };
     return player;
@@ -41,7 +51,7 @@ void player_input_update(Player *player) {
     }
     if (IsKeyDown('A') == 1) {
 
-       player->angle -= 2.0f; 
+       player->angle -= 10.0f; 
     }
     if (IsKeyDown('S') == 1) {
         player->pos.x -= cos(TO_RADIANS(player->angle)) * player-> velocity; 
@@ -49,7 +59,7 @@ void player_input_update(Player *player) {
 
     }
     if (IsKeyDown('D') == 1) {
-       player->angle += 2.0f; 
+       player->angle += 10.0f; 
     }
 
     if (player->angle >= 360.0f) {
@@ -61,11 +71,6 @@ void player_input_update(Player *player) {
 }
 
 
-// C doesn't have tuples so I'm doing this as a return value for the raycast function
-typedef struct {
-    float distance;
-    Vector2 hit_point;
-} Tuple_Return;
 
 float dist(float ax, float ay, float bx, float by) {
     return sqrtf((bx - ax) * (bx - ax) + (by - ay) * (by - ay));
@@ -219,6 +224,7 @@ Tuple_Return raycast_dda(Vector2 start, float angle, World *world) {
             ray_pos.y,
         },
     };
+    
     /*
     // Test
     Vector2 start_pos = {start.x, start.y};
@@ -234,20 +240,43 @@ Tuple_Return raycast_dda(Vector2 start, float angle, World *world) {
 }
 
 // Do this later at some point
-void raycast_fov() {
-    return true;
+void raycast_fov(Player *self, Vector2 pos, float angle, int num_rays, Tuple_Return positions[], World *world) {
+
+    float start_angle = angle - (num_rays / 2);
+
+    for (int i = 0; i < num_rays; i++) {
+        float angle_new = start_angle + i;
+        Tuple_Return point = raycast_dda(pos, angle_new, world);
+        // fix fisheye effect
+        float ca = angle - angle_new;
+        point.distance *= cos(TO_RADIANS(ca));
+        self->positions[i].distance = point.distance;
+        self->positions[i].hit_point = point.hit_point;        
+    }
+
 }
 
-void render_player(Player *player) {
-    DrawCircle(player->pos.x, player->pos.y, 5.0, BLUE);
+void render_player(Player *self, int num_rays) {
+    DrawCircle(self->pos.x, self->pos.y, 5.0, BLUE);
 
-    Vector2 start_pos = {player->pos.x, player->pos.y};
+    Vector2 start_pos = {self->pos.x, self->pos.y};
     Vector2 end_pos = {
-        player->pos.x + cos(TO_RADIANS(player->angle)) * 50.0f,
-        player->pos.y + sin(TO_RADIANS(player->angle)) * 50.0f,
+        self->pos.x + cos(TO_RADIANS(self->angle)) * 50.0f,
+        self->pos.y + sin(TO_RADIANS(self->angle)) * 50.0f,
     };
 
     DrawLineEx(start_pos, end_pos, 5.0, RED);
+
+    for (int i = 0; i < num_rays; i++) {
+        Vector2 ray_pos = self->positions[i].hit_point;
+        // Test
+        Vector2 start_pos = {self->pos.x, self->pos.y};
+        Vector2 end_pos = {
+           ray_pos.x, 
+           ray_pos.y, 
+        };
+        DrawLineEx(start_pos, end_pos, 5.0, RED);
+    }
 }
 
 
@@ -289,16 +318,20 @@ int main() {
     World world = world_new(8, 64);
     Player player = player_new();
 
+    int num_rays = 60;
+
+    // Low fps cuz this hurts my rasberry pi rn
+    SetTargetFPS(15);
+
         while (!WindowShouldClose()) {
         player_input_update(&player);
         // Start drawing
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
-
+        raycast_fov(&player, player.pos, player.angle, num_rays, player.positions, &world);
         render_world(&world);
-        render_player(&player);
-        raycast_dda(player.pos, player.angle, &world); 
+        render_player(&player, 60);
         
         EndDrawing();
     }
