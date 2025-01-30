@@ -6,20 +6,27 @@
 
 //TODO:
 //1. Incorporate screen size into map draw
+//2. Make fov independent of the # of rays casted
 
 const int screen_width = 512;
 const int screen_height = 512;
+
+typedef enum {
+    VERTICAL,
+    HORIZONTAL,
+}wall_t;
 // C doesn't have tuples so I'm doing this as a return value for the raycast function
 typedef struct {
     float distance;
     Vector2 hit_point;
+    wall_t type;
 } Tuple_Return;
 
 typedef struct {
     Vector2 pos;
     float velocity;
     float angle;
-    Tuple_Return positions[100];
+    Tuple_Return positions[1000];
 } Player;
 
 typedef struct {
@@ -223,16 +230,23 @@ Tuple_Return raycast_dda(Vector2 start, float angle, World *world) {
     */
 
     float final_dist;
+    wall_t type;
 
     if (disv < dish) {
+        // Vertical hit
         ray_pos.x = vx;
         ray_pos.y = vy;
         final_dist = disv;
+        type = VERTICAL;
+
     } else {
+        // Horizontal hit
         ray_pos.x = hx;
         ray_pos.y = hy;
         final_dist = dish;
+        type = HORIZONTAL;
     }
+
 
     Tuple_Return final_vec = {
         final_dist,
@@ -240,6 +254,7 @@ Tuple_Return raycast_dda(Vector2 start, float angle, World *world) {
             ray_pos.x,
             ray_pos.y,
         },
+        type,
     };
     
     /*
@@ -256,22 +271,32 @@ Tuple_Return raycast_dda(Vector2 start, float angle, World *world) {
     return final_vec;
 }
 
-// Do this later at some point
-void raycast_fov(Player *self, Vector2 pos, float angle, int num_rays, Tuple_Return positions[], World *world) {
+void raycast_fov(Player *self, Vector2 pos, float angle, float fov, int num_rays, World *world) {
 
-    float start_angle = angle - (num_rays / 2);
+    // Calculate the starting angle (centered on the player's view direction)
+    float start_angle = angle - (fov / 2.0f);
+
+    // Step between rays
+    float angle_step = fov / (num_rays - 1);
 
     for (int i = 0; i < num_rays; i++) {
-        float angle_new = start_angle + i;
+        // Calculate the current ray's angle
+        float angle_new = start_angle + (i * angle_step);
+
+        // Perform DDA raycasting for the current angle
         Tuple_Return point = raycast_dda(pos, angle_new, world);
-        // fix fisheye effect
+
+        // Fix fisheye effect (adjust the distance based on the angle difference)
         float ca = angle - angle_new;
         point.distance *= cos(TO_RADIANS(ca));
-        self->positions[i].distance = point.distance;
-        self->positions[i].hit_point = point.hit_point;        
-    }
 
+        // Store the result in the player's positions array
+        self->positions[i].distance = point.distance;
+        self->positions[i].hit_point = point.hit_point;
+        self->positions[i].type = point.type;
+    }
 }
+
 
 void render_minimap(Player *self, int num_rays) {
     DrawCircle(self->pos.x, self->pos.y, 5.0, BLUE);
@@ -297,18 +322,33 @@ void render_minimap(Player *self, int num_rays) {
 }
 
 void render_fps(Player *self, int num_rays, World *world) {
-   
-    float column_width = (screen_width /  num_rays);
+
+    float column_width = (float)screen_width / (float)num_rays;
 
     for (int i = 0; i < num_rays; i++) {
         float wall_height = (screen_height * world->tile_size) / self->positions[i].distance;
-        float y = (screen_height - wall_height) / 2.0;
-        float x = i * column_width;
-        float height = wall_height;
+        int y = (screen_height - wall_height) / 2;
+        int x = i * column_width;  // Ensure pixel alignment
+        int height = wall_height;
 
-        DrawRectangle(x,y, column_width, height, BLUE);
+        // Simple color logic based on wall hit type
+        Color color;
+
+        // Vertical Wall (darker blue)
+        if (self->positions[i].type == VERTICAL) {
+            color = (Color){ 0, 0, 200, 255 };  // Darker blue
+        }
+        // Horizontal Wall (lighter blue)
+        else {
+            color = (Color){ 0, 0, 255, 255 };  // Brighter blue
+        }
+
+
+        // Draw the wall segment with the chosen color
+        DrawRectangle(x, y, column_width + 1, height, color);
     }
 }
+
 
 void render_world(World *world) {  
     for (int i=0; i < world->map_size; i++) {
@@ -331,9 +371,9 @@ World world_new(int world_size, int tile_size) {
             {1,0,0,0,0,0,0,1},
             {1,0,0,1,0,0,0,1},
             {1,0,0,0,0,0,0,1},
-            {1,0,0,0,0,0,0,1},
-            {1,0,0,0,0,0,0,1},
-            {1,0,0,0,0,0,0,1},
+            {1,0,0,0,0,1,0,1},
+            {1,0,0,0,0,1,0,1},
+            {1,0,0,0,0,1,0,1},
             {1,1,1,1,1,1,1,1}
         }
     };
@@ -349,7 +389,7 @@ Renderer renderer_new() {
 }
 
 void render(Renderer *self, Player *player, int num_rays, World *world) {
-        raycast_fov(player, player->pos, player->angle, num_rays, player->positions, world);
+        raycast_fov(player, player->pos, player->angle, 60.0, num_rays,  world);
 
         if (self->type == MINIMAP) {
             render_world(world);
@@ -369,7 +409,7 @@ int main() {
     Player player = player_new();
     Renderer renderer = renderer_new();
 
-    int num_rays = 60;
+    int num_rays = 250;
 
     // Low fps cuz this hurts my rasberry pi rn
     SetTargetFPS(20);
@@ -378,7 +418,7 @@ int main() {
             player_input_update(&player, &renderer);
             // Start drawing
             BeginDrawing();
-            ClearBackground(RAYWHITE);
+            ClearBackground(GRAY);
 
             render(&renderer, &player, num_rays, &world);
                 
