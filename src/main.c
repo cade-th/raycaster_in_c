@@ -1,12 +1,13 @@
 #include "raylib.h"
 #include <stdio.h>
 #include "math.h"
+#include "textures.h"
 
 #define TO_RADIANS(degrees) (degrees * (3.14159f / 180.0f))
 
 //TODO:
 //1. Incorporate screen size into map draw
-//2. Make fov independent of the # of rays casted
+//2. Fix rays being drawn at infinite distance
 
 const int screen_width = 512;
 const int screen_height = 512;
@@ -26,12 +27,12 @@ typedef struct {
     Vector2 pos;
     float velocity;
     float angle;
-    Tuple_Return positions[1000];
+    Tuple_Return positions[250];
 } Player;
 
 typedef struct {
     int map_size;
-    int tile_size;
+    float tile_size;
     int data[8][8];
 } World;
 
@@ -64,7 +65,6 @@ void player_input_update(Player *self, Renderer *renderer) {
     
     }
     if (IsKeyDown('A') == 1) {
-
        self->angle -= 10.0f; 
     }
     if (IsKeyDown('S') == 1) {
@@ -271,34 +271,7 @@ Tuple_Return raycast_dda(Vector2 start, float angle, World *world) {
     return final_vec;
 }
 
-void raycast_fov(Player *self, Vector2 pos, float angle, float fov, int num_rays, World *world) {
-
-    // Calculate the starting angle (centered on the player's view direction)
-    float start_angle = angle - (fov / 2.0f);
-
-    // Step between rays
-    float angle_step = fov / (num_rays - 1);
-
-    for (int i = 0; i < num_rays; i++) {
-        // Calculate the current ray's angle
-        float angle_new = start_angle + (i * angle_step);
-
-        // Perform DDA raycasting for the current angle
-        Tuple_Return point = raycast_dda(pos, angle_new, world);
-
-        // Fix fisheye effect (adjust the distance based on the angle difference)
-        float ca = angle - angle_new;
-        point.distance *= cos(TO_RADIANS(ca));
-
-        // Store the result in the player's positions array
-        self->positions[i].distance = point.distance;
-        self->positions[i].hit_point = point.hit_point;
-        self->positions[i].type = point.type;
-    }
-}
-
-
-void render_minimap(Player *self, int num_rays) {
+void render_minimap(Player *self, float num_rays) {
     DrawCircle(self->pos.x, self->pos.y, 5.0, BLUE);
 
     Vector2 start_pos = {self->pos.x, self->pos.y};
@@ -321,34 +294,90 @@ void render_minimap(Player *self, int num_rays) {
     }
 }
 
-void render_fps(Player *self, int num_rays, World *world) {
+void raycast_fov(Player *self, Vector2 pos, float angle, float fov, int num_rays, World *world) {
 
-    float column_width = (float)screen_width / (float)num_rays;
+    float start_angle = angle - (fov / 2.0f);
+    float angle_step = fov / ((float)num_rays- 1.0);
 
     for (int i = 0; i < num_rays; i++) {
-        float wall_height = (screen_height * world->tile_size) / self->positions[i].distance;
-        int y = (screen_height - wall_height) / 2;
-        int x = i * column_width;  // Ensure pixel alignment
-        int height = wall_height;
+        float angle_new = start_angle + (i * angle_step);
+        Tuple_Return point = raycast_dda(pos, angle_new, world);
 
-        // Simple color logic based on wall hit type
-        Color color;
+        // Fix fisheye effect
+        float ca = angle - angle_new;
+        point.distance *= cos(TO_RADIANS(ca));
 
-        // Vertical Wall (darker blue)
-        if (self->positions[i].type == VERTICAL) {
-            color = (Color){ 0, 0, 200, 255 };  // Darker blue
-        }
-        // Horizontal Wall (lighter blue)
-        else {
-            color = (Color){ 0, 0, 255, 255 };  // Brighter blue
-        }
-
-
-        // Draw the wall segment with the chosen color
-        DrawRectangle(x, y, column_width + 1, height, color);
+        self->positions[i].distance = point.distance;
+        self->positions[i].hit_point = point.hit_point;
+        self->positions[i].type = point.type;
     }
 }
 
+// world->tile_size = 64
+// the screen is 512x512 pixels
+// the texture in the atlas is 32x32 pixels, at (0,0) in the atlas
+// the raycaster is casting 200 rays 
+// int texture_column = (int)((hit_offset / world->tile_size) * texture_width);
+// hit_offset = fmod(self->positions[i].hit_point.y, world->tile_size);
+void render_fps(Player *self, int num_rays, World *world, Texture2D *atlas) {
+    float column_width = ceil((float)screen_width / num_rays);
+
+    for (int i = 0; i < num_rays; i++) {
+        float wall_height = (screen_height * world->tile_size) / self->positions[i].distance;
+        float y = (screen_height - wall_height) / 2.0;
+        float x = i * column_width;
+        float height = wall_height;
+
+        Color ceiling_color = (Color){ 135, 206, 250, 255 };
+        Color floor_color = (Color){ 139, 69, 19, 255 };
+
+        // Assume world->tile_size = 64 and texture width is 32
+        int texture_width = 32;
+        float hit_offset;
+
+        // Choose the correct coordinate based on the wall hit type
+        if (self->positions[i].type == VERTICAL) {
+            // Vertical collision: use the y coordinate of the hit point.
+            hit_offset = fmod(self->positions[i].hit_point.y, world->tile_size);
+        } else if (self->positions[i].type == HORIZONTAL) {
+            // Horizontal collision: use the x coordinate of the hit point.
+            hit_offset = fmod(self->positions[i].hit_point.x, world->tile_size);
+        }
+
+        // Map the hit offset to a texture column (assuming your texture is 32 pixels wide)
+        int texture_column = (int)((hit_offset / world->tile_size) * texture_width);
+
+        // Corrected source rectangle to render texture at (0,0)
+        Rectangle source_rect = {
+            texture_column,
+            32,    // Y position in the atlas
+            1,   // Width of the sub-texture
+            32    // Height of the sub-texture
+        };
+
+        Rectangle dest_rect = {
+            x, y, column_width, height
+        };
+
+        // Draw the ceiling section
+        DrawRectangle(x, 0, column_width, y, ceiling_color);
+
+        // Draw the wall segment with texture mapping
+        if (self->positions[i].distance < 1000) {
+            DrawTexturePro(
+                *atlas,          // The texture atlas
+                source_rect,     // Now correctly using texture at (0,0)
+                dest_rect,       // Destination rectangle on screen
+                (Vector2){0, 0}, // Origin offset (top-left corner)
+                0.0f,            // Rotation
+                WHITE            // Tint color (none)
+            );
+        }
+
+        // Draw the floor section
+        DrawRectangle(x, y + height - 1, column_width, screen_height - (y + height), floor_color);
+    }
+}
 
 void render_world(World *world) {  
     for (int i=0; i < world->map_size; i++) {
@@ -370,8 +399,8 @@ World world_new(int world_size, int tile_size) {
             {1,1,1,1,1,1,1,1},
             {1,0,0,0,0,0,0,1},
             {1,0,0,1,0,0,0,1},
-            {1,0,0,0,0,0,0,1},
-            {1,0,0,0,0,1,0,1},
+            {0,0,0,0,0,0,0,1},
+            {0,0,0,0,0,1,0,1},
             {1,0,0,0,0,1,0,1},
             {1,0,0,0,0,1,0,1},
             {1,1,1,1,1,1,1,1}
@@ -388,7 +417,7 @@ Renderer renderer_new() {
     return renderer;
 }
 
-void render(Renderer *self, Player *player, int num_rays, World *world) {
+void render(Renderer *self, Player *player, int num_rays, World *world, Texture2D *atlas) {
         raycast_fov(player, player->pos, player->angle, 60.0, num_rays,  world);
 
         if (self->type == MINIMAP) {
@@ -396,20 +425,21 @@ void render(Renderer *self, Player *player, int num_rays, World *world) {
             render_minimap(player, num_rays);
         }
         if (self->type == FPS) {
-            render_fps(player, num_rays, world);
+            render_fps(player, num_rays, world, atlas);
         }
 }
-
 
 int main() {
     // Initialize window
     InitWindow(screen_width, screen_height, "Raycaster in C");
 
-    World world = world_new(8, screen_width / 8);
+    Texture2D atlas = LoadTexture("player_sheet.png");
+
+    World world = world_new(8, 64);
     Player player = player_new();
     Renderer renderer = renderer_new();
 
-    int num_rays = 250;
+    int num_rays = 200;
 
     // Low fps cuz this hurts my rasberry pi rn
     SetTargetFPS(20);
@@ -418,9 +448,9 @@ int main() {
             player_input_update(&player, &renderer);
             // Start drawing
             BeginDrawing();
-            ClearBackground(GRAY);
+            ClearBackground(BLACK);
 
-            render(&renderer, &player, num_rays, &world);
+            render(&renderer, &player, num_rays, &world, &atlas);
                 
             EndDrawing();
     }
