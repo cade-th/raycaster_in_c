@@ -1,6 +1,6 @@
 #include "player.h"
-#include "render.h"
 #include "world.h"
+#include "state.h"
 
 Player player_new() {
     Player player = {
@@ -15,7 +15,12 @@ Player player_new() {
 }
 
 void render_player(Player *self, float num_rays) {
-    DrawCircle(self->pos.x, self->pos.y, 5.0, BLUE);
+
+    DrawCircle(
+        world_to_screen(self->pos, &state.renderer->camera).x, 
+        world_to_screen(self->pos, &state.renderer->camera).y, 
+        5.0,
+        BLUE);
 
     Vector2 start_pos = {self->pos.x, self->pos.y};
     Vector2 end_pos = {
@@ -37,14 +42,14 @@ void render_player(Player *self, float num_rays) {
     }
 }
 
-void raycast_fov(Player *self, Vector2 pos, float angle, float fov, int num_rays, World *world) {
+void raycast_fov(Player *self, Vector2 pos, float angle, float fov) {
 
     float start_angle = angle - (fov / 2.0f);
-    float angle_step = fov / ((float)num_rays- 1.0);
+    float angle_step = fov / ((float)state.num_rays- 1.0);
 
-    for (int i = 0; i < num_rays; i++) {
+    for (int i = 0; i < state.num_rays; i++) {
         float angle_new = start_angle + (i * angle_step);
-        Tuple_Return point = raycast_dda(pos, angle_new, world);
+        Tuple_Return point = raycast_dda(pos, angle_new);
 
         // Fix fisheye effect
         float ca = angle - angle_new;
@@ -56,11 +61,11 @@ void raycast_fov(Player *self, Vector2 pos, float angle, float fov, int num_rays
     }
 }
 
-void render_fps(Player *self, int num_rays, World *world, Texture2D *atlas) {
-    float column_width = ceil((float)screen_width / num_rays);
+void render_fps(Player *self) {
+    float column_width = ceil((float)screen_width / state.num_rays);
 
-    for (int i = 0; i < num_rays; i++) {
-        float wall_height = (screen_height * world->tile_size) / self->positions[i].distance;
+    for (int i = 0; i < state.num_rays; i++) {
+        float wall_height = (screen_height * state.world->tile_size) / self->positions[i].distance;
         float y = (screen_height - wall_height) / 2.0;
         float x = i * column_width;
         float height = wall_height;
@@ -72,12 +77,12 @@ void render_fps(Player *self, int num_rays, World *world, Texture2D *atlas) {
         float hit_offset;
 
         if (self->positions[i].type == VERTICAL) {
-            hit_offset = fmod(self->positions[i].hit_point.y, world->tile_size);
+            hit_offset = fmod(self->positions[i].hit_point.y, state.world->tile_size);
         } else {
-            hit_offset = fmod(self->positions[i].hit_point.x, world->tile_size);
+            hit_offset = fmod(self->positions[i].hit_point.x, state.world->tile_size);
         }
 
-        int texture_column = (int)((hit_offset / world->tile_size) * texture_width);
+        int texture_column = (int)((hit_offset / state.world->tile_size) * texture_width);
 
         Rectangle source_rect = {
             texture_column,
@@ -96,7 +101,7 @@ void render_fps(Player *self, int num_rays, World *world, Texture2D *atlas) {
         // Wall
         // TODO: Fix the max distance thing here
             DrawTexturePro(
-                *atlas,          
+                *state.atlas,          
                 source_rect,     
                 dest_rect,       
                 (Vector2){0, 0}, 
@@ -108,48 +113,13 @@ void render_fps(Player *self, int num_rays, World *world, Texture2D *atlas) {
     }
 }
 
-void player_input_update(Player *self, Renderer *renderer) {
-    if (IsKeyDown('W') == 1) {
-        self->pos.x += cos(TO_RADIANS(self->angle)) * self-> velocity; 
-        self->pos.y += sin(TO_RADIANS(self->angle)) * self-> velocity; 
-    
-    }
-    if (IsKeyDown('A') == 1) {
-       self->angle -= 10.0f; 
-    }
-    if (IsKeyDown('S') == 1) {
-        self->pos.x -= cos(TO_RADIANS(self->angle)) * self-> velocity; 
-        self->pos.y -= sin(TO_RADIANS(self->angle)) * self-> velocity; 
-
-    }
-    if (IsKeyDown('D') == 1) {
-       self->angle += 10.0f; 
-    }
-
-    // Printf's don't work here for some reason?
-    if (IsKeyDown('U') == 1) {
-        renderer->type = MINIMAP; 
-    }
-    if (IsKeyDown('I') == 1) {
-        renderer->type = FPS; 
-    }
-
-
-    if (self->angle >= 360.0f) {
-        self->angle -= 360.0f;
-    }
-    if (self->angle < 0.0f) {
-        self->angle += 360.0f;
-    }
-}
-
 
 
 float dist(float ax, float ay, float bx, float by) {
     return sqrtf((bx - ax) * (bx - ax) + (by - ay) * (by - ay));
 }
 
-Tuple_Return raycast_dda(Vector2 start, float angle, World *world) {
+Tuple_Return raycast_dda(Vector2 start, float angle) {
 
     Vector2 ray_pos = { 0.0, 0.0 };
     float y_offset, x_offset, map_x, map_y;
@@ -169,14 +139,14 @@ Tuple_Return raycast_dda(Vector2 start, float angle, World *world) {
         // This snaps the value back to the nearest 64th value via a right and then left bitshift 
         ray_pos.y = (((int)start.y >> 6) << 6) - 0.001;
         ray_pos.x = start.x + (start.y - ray_pos.y) * atan;
-        y_offset = -(world->tile_size);
+        y_offset = -(state.world->tile_size);
         x_offset = y_offset * atan;
     }
     // Direciton Down?
     else if (sin(TO_RADIANS(angle)) > 0.0f) {
-        ray_pos.y = (((int)start.y >> 6) << 6) + world->tile_size;
+        ray_pos.y = (((int)start.y >> 6) << 6) + state.world->tile_size;
         ray_pos.x = start.x + (start.y - ray_pos.y) * atan;
-        y_offset = world->tile_size;
+        y_offset = state.world->tile_size;
         x_offset = y_offset * atan;
     }
     // Direciton Perfectly Horizontal
@@ -192,8 +162,8 @@ Tuple_Return raycast_dda(Vector2 start, float angle, World *world) {
         map_x = (int) ray_pos.x >> 6;
         map_y = (int) ray_pos.y >> 6; 
 
-        if (map_x >= 0 && map_y >= 0 && map_x < world->map_size && map_y < world->map_size) {
-            if (world->data[(int)map_x][(int)map_y] == STONE) {
+        if (map_x >= 0 && map_y >= 0 && map_x < state.world->map_size && map_y < state.world->map_size) {
+            if (state.world->data[(int)map_x][(int)map_y] == STONE) {
                 dof = 8;
                 hx = ray_pos.x;
                 hy = ray_pos.y;
@@ -229,14 +199,14 @@ Tuple_Return raycast_dda(Vector2 start, float angle, World *world) {
         // This snaps the value back to the nearest 64th value via a right and then left bitshift 
         ray_pos.x = (((int)start.x >> 6) << 6) - 0.001;
         ray_pos.y = start.y + (start.x - ray_pos.x) * atan;
-        x_offset = -(world->tile_size);
+        x_offset = -(state.world->tile_size);
         y_offset = x_offset * atan;
     }
     // Direciton Down?
     else if (cos(TO_RADIANS(angle)) > 0.0f) {
-        ray_pos.x = (((int)start.x >> 6) << 6) + world->tile_size;
+        ray_pos.x = (((int)start.x >> 6) << 6) + state.world->tile_size;
         ray_pos.y = start.y + (start.x - ray_pos.x) * atan;
-        x_offset = world->tile_size;
+        x_offset = state.world->tile_size;
         y_offset = x_offset * atan;
     }
     // Direciton Perfectly Horizontal
@@ -252,8 +222,8 @@ Tuple_Return raycast_dda(Vector2 start, float angle, World *world) {
         map_x = (int) ray_pos.x >> 6;
         map_y = (int) ray_pos.y >> 6; 
 
-        if (map_x >= 0 && map_y >= 0 && map_x < world->map_size && map_y < world->map_size) {
-            if (world->data[(int)map_x][(int)map_y] == STONE) {
+        if (map_x >= 0 && map_y >= 0 && map_x < state.world->map_size && map_y < state.world->map_size) {
+            if (state.world->data[(int)map_x][(int)map_y] == STONE) {
                 dof = 8;
                 vx = ray_pos.x;
                 vy = ray_pos.y;

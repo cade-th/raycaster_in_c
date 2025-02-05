@@ -1,5 +1,6 @@
 #include "render.h"
 #include "player.h"
+#include "state.h"
 
 Renderer renderer_new() {
     Camera2D camera = {
@@ -16,15 +17,19 @@ Renderer renderer_new() {
     return renderer;
 }
 
-void render(Renderer *self, Player *player, int num_rays, World *world, Texture2D *atlas) {
-        raycast_fov(player, player->pos, player->angle, 60.0, num_rays,  world);
+void render(Renderer *self){
+        raycast_fov(
+            state.player,
+            state.player->pos,
+            state.player->angle, 
+            60.0);
 
         if (self->type == MINIMAP) {
-            render_world(world, &self->camera, atlas);
-            render_player(player, num_rays);
+            render_world(state.world, &self->camera);
+            render_player(state.player, state.num_rays);
         }
         if (self->type == FPS) {
-            render_fps(player, num_rays, world, atlas);
+            render_fps(state.player);
         }
 }
 

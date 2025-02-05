@@ -1,10 +1,6 @@
 #pragma once
 
-#include "state.h"
 #include "raylib.h"
-#include "world.h"
-
-struct Player;
 
 typedef enum renderer_t {
     MINIMAP,
@@ -19,5 +15,5 @@ typedef struct Renderer{
 
 Renderer renderer_new();
 
-void render(Renderer *self, struct Player *player, int num_rays, World *world, Texture2D *atlas);
+void render(Renderer *self);
 

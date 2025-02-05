@@ -1,14 +1,8 @@
 #pragma once
 
-#include "state.h"
 #include "raylib.h"
 #include <math.h>
-#include "world.h"
-
 #define TO_RADIANS(degrees) (degrees * (3.14159f / 180.0f))
-
-// Need this forward declaration or else the compiler bitches
-struct Renderer;
 
 typedef enum wall_t {
     VERTICAL,
@@ -30,10 +24,9 @@ typedef struct Player {
 } Player;
 
 Player player_new();
-Tuple_Return raycast_dda(Vector2 start, float angle, World *world);
+Tuple_Return raycast_dda(Vector2 start, float angle);
 float dist(float ax, float ay, float bx, float by);
-void player_input_update(Player *self, struct Renderer *renderer);
-Tuple_Return raycast_dda(Vector2 start, float angle, World *world);
+Tuple_Return raycast_dda(Vector2 start, float angle);
 void render_player(Player *self, float num_rays);
-void raycast_fov(Player *self, Vector2 pos, float angle, float fov, int num_rays, World *world);
-void render_fps(Player *self, int num_rays, World *world, Texture2D *atlas);
+void raycast_fov(Player *self, Vector2 pos, float angle, float fov);
+void render_fps(Player *self);

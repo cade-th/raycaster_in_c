@@ -1,4 +1,5 @@
 #include "world.h"
+#include "state.h"
 
 void render_world_temp(World *world) {  
     for (int i=0; i < world->map_size; i++) {
@@ -57,7 +58,7 @@ Rectangle get_rectangle(Block_t block) {
 }
 
 // Something is stopping the raycasting here
-void render_world(World *self, Camera2D *camera, Texture2D *atlas) {
+void render_world(World *self, Camera2D *camera) {
     
     for (int i=0; i < WORLD_SIZE; i++) {
         for (int j=0; j < WORLD_SIZE; j++) {
@@ -79,7 +80,7 @@ void render_world(World *self, Camera2D *camera, Texture2D *atlas) {
             Rectangle texture_section = get_rectangle(self->data[i][j]);
 
             DrawTexturePro(
-                *atlas,
+                *state.atlas,
                 texture_section, 
                 dest_rect,
                 (Vector2){0, 0}, 
