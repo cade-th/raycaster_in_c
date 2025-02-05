@@ -33,6 +33,7 @@ void render_player(Player *self, float num_rays) {
         world_to_screen(end_pos, &state.renderer->camera),
         5.0, 
         RED);
+    /*
 
     for (int i = 0; i < num_rays; i++) {
         Vector2 ray_pos = self->positions[i].hit_point;
@@ -48,6 +49,8 @@ void render_player(Player *self, float num_rays) {
             5.0, 
             RED);
     }
+
+    */
 }
 
 void raycast_fov(Player *self, Vector2 pos, float angle, float fov) {

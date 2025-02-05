@@ -19,26 +19,18 @@ Renderer renderer_new() {
 }
 
 void render(Renderer *self){
-        raycast_fov(
-            state.player,
-            state.player->pos,
-            state.player->angle, 
-            60.0);
-    /*
-        raycast_single(
-            state.player,
-            state.player->pos,
-            state.player->angle, 
-            60.0);
-    */
-    
 
         if (self->type == MINIMAP) {
             render_world(state.world, &self->camera);
             render_player(state.player, state.num_rays);
         }
         if (self->type == FPS) {
-            render_fps(state.player);
+         raycast_fov(
+            state.player,
+            state.player->pos,
+            state.player->angle, 
+            60.0);
+         render_fps(state.player);
         }
 
         // ui_render_debug();
