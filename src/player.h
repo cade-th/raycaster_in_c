@@ -30,3 +30,4 @@ Tuple_Return raycast_dda(Vector2 start, float angle);
 void render_player(Player *self, float num_rays);
 void raycast_fov(Player *self, Vector2 pos, float angle, float fov);
 void render_fps(Player *self);
+void raycast_single(Player *self, Vector2 pos, float angle, float fov);

@@ -6,14 +6,15 @@
 #include "player.h"
 #include "render.h"
 #include "state.h"
+#include "ui.h"
 
 //TODO:
 //1. Incorporate screen size into map draw
-//2. Fix rays being drawn at infinite distance
 //3. Use LUT's instead of direction sin and cos calculations
 //4. Make an editor renderer
 //5. Add collision detection
 
+// Make the global state available for everyone
 State state;
 
 int main() {
@@ -23,9 +24,10 @@ int main() {
     Texture2D atlas = LoadTexture("player_sheet.png");
 
     // Poor man's dependency injection?
-    World world = world_new(8, 64);
+    World world = world_new_temp(64, 64);
     Player player = player_new();
     Renderer renderer = renderer_new();
+    UI ui = ui_new();
     int num_rays = 200;
 
     state.player = &player; 
@@ -33,11 +35,14 @@ int main() {
     state.renderer = &renderer;
     state.num_rays = num_rays;
     state.atlas = &atlas;
+    state.ui = &ui;
 
 
-    world.data[10][10] = STONE;
-    world.data[10][11] = STONE;
-    world.data[10][12] = STONE;
+    world.data[5][5] = STONE;
+    world.data[5][6] = STONE;
+    world.data[5][6] = STONE;
+
+    world.data[16][16] = STONE;
 
     // Low fps cuz this hurts my rasberry pi rn
     SetTargetFPS(20);
@@ -46,7 +51,7 @@ int main() {
             input_update();
             // Start drawing
             BeginDrawing();
-            ClearBackground(WHITE);
+            ClearBackground(GRAY);
 
             render(state.renderer);
                 

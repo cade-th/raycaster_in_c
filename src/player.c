@@ -28,7 +28,11 @@ void render_player(Player *self, float num_rays) {
         self->pos.y + sin(TO_RADIANS(self->angle)) * 50.0f,
     };
 
-    DrawLineEx(start_pos, end_pos, 5.0, RED);
+    DrawLineEx(
+        world_to_screen(start_pos, &state.renderer->camera),
+        world_to_screen(end_pos, &state.renderer->camera),
+        5.0, 
+        RED);
 
     for (int i = 0; i < num_rays; i++) {
         Vector2 ray_pos = self->positions[i].hit_point;
@@ -38,7 +42,11 @@ void render_player(Player *self, float num_rays) {
            ray_pos.x, 
            ray_pos.y, 
         };
-        DrawLineEx(start_pos, end_pos, 5.0, RED);
+        DrawLineEx(
+            world_to_screen(start_pos, &state.renderer->camera),
+            world_to_screen(end_pos, &state.renderer->camera),
+            5.0, 
+            RED);
     }
 }
 
@@ -61,10 +69,21 @@ void raycast_fov(Player *self, Vector2 pos, float angle, float fov) {
     }
 }
 
+void raycast_single(Player *self, Vector2 pos, float angle, float fov) {
+
+        Tuple_Return point = raycast_dda(pos, self->angle);
+
+        self->positions[0].distance = point.distance;
+        self->positions[0].hit_point = point.hit_point;
+        self->positions[0].type = point.type;
+}
+
+
 void render_fps(Player *self) {
     float column_width = ceil((float)screen_width / state.num_rays);
 
     for (int i = 0; i < state.num_rays; i++) {
+
         float wall_height = (screen_height * state.world->tile_size) / self->positions[i].distance;
         float y = (screen_height - wall_height) / 2.0;
         float x = i * column_width;
@@ -76,6 +95,7 @@ void render_fps(Player *self) {
         int texture_width = 32;
         float hit_offset;
 
+        // for textures
         if (self->positions[i].type == VERTICAL) {
             hit_offset = fmod(self->positions[i].hit_point.y, state.world->tile_size);
         } else {
@@ -85,8 +105,8 @@ void render_fps(Player *self) {
         int texture_column = (int)((hit_offset / state.world->tile_size) * texture_width);
 
         Rectangle source_rect = {
-            texture_column,
-            0,    
+            texture_column + 32,
+            32,    
             1,   
             32    
         };
@@ -96,10 +116,12 @@ void render_fps(Player *self) {
         };
 
         // Ceiling
-        DrawRectangle(x, 0, column_width, y, ceiling_color);
+        // If I don't add 10 to y here than there is some gray area in the horizon
+        DrawRectangle(x, 0, column_width, y + 10, ceiling_color);
 
-        // Wall
-        // TODO: Fix the max distance thing here
+        // Ray is out of the map so don't draw a wall
+        if (self->positions[i].distance < 7000.0f) {
+            // Wall
             DrawTexturePro(
                 *state.atlas,          
                 source_rect,     
@@ -108,8 +130,9 @@ void render_fps(Player *self) {
                 0.0f,            
                 WHITE            
             );
-        // Floor
-        DrawRectangle(x, y + height - 1, column_width, screen_height - (y + height), floor_color);
+        }
+                // Floor
+        DrawRectangle(x, y + height, column_width, screen_height - (y + height), floor_color);
     }
 }
 
@@ -127,7 +150,8 @@ Tuple_Return raycast_dda(Vector2 start, float angle) {
     float hx = start.x;
     float hy = start.y;
     float vx = start.x;
-    float vy = start.y; float dish = 10000.0;
+    float vy = start.y; 
+    float dish = 10000.0;
     float disv = 10000.0;
           
     // Horizontal Line Check
@@ -266,6 +290,10 @@ Tuple_Return raycast_dda(Vector2 start, float angle) {
         type = HORIZONTAL;
     }
 
+    if (disv >= 10000.0f && dish >= 10000.0f) {
+        // No wall hit, ray exited the map
+        final_dist = 10000.0f;  // Large distance to ignore the ray during rendering
+    }
 
     Tuple_Return final_vec = {
         final_dist,

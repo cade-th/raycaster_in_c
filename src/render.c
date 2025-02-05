@@ -1,4 +1,5 @@
 #include "render.h"
+#include "ui.h"
 #include "player.h"
 #include "state.h"
 
@@ -7,11 +8,11 @@ Renderer renderer_new() {
         (Vector2) {0.0,0.0},
         (Vector2) {0.0,0.0},
         0.0,
-        1.0,
+        0.5,
     };
 
     Renderer renderer = {
-        FPS,
+        MINIMAP,
         camera,
     };
     return renderer;
@@ -23,6 +24,14 @@ void render(Renderer *self){
             state.player->pos,
             state.player->angle, 
             60.0);
+    /*
+        raycast_single(
+            state.player,
+            state.player->pos,
+            state.player->angle, 
+            60.0);
+    */
+    
 
         if (self->type == MINIMAP) {
             render_world(state.world, &self->camera);
@@ -31,6 +40,8 @@ void render(Renderer *self){
         if (self->type == FPS) {
             render_fps(state.player);
         }
+
+        // ui_render_debug();
 }
 
 

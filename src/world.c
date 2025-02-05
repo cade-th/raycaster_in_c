@@ -13,7 +13,6 @@ void render_world_temp(World *world) {
         }
 }
 
-
 World world_new(int world_size, int tile_size) {
     World world = {
         world_size,
@@ -33,6 +32,21 @@ World world_new(int world_size, int tile_size) {
     return world;
 }
 
+World world_new_temp(int world_size, int tile_size) {
+    
+    World world = {
+        world_size,
+        tile_size,
+    };
+    
+    for (int i=0; i < world_size; i++) {
+        for (int j=0; j < world_size; j++) {
+            world.data[i][j] = GRASS;
+        }
+    }
+
+    return world;
+}
 
 Vector2 world_to_screen(Vector2 world_pos, Camera2D *camera) {
     Vector2 temp = {
