@@ -1,5 +1,15 @@
 ### Raycaster in C
 
+Dependencies:
+Raylib:
+    git clone https://github.com/raysan5/raylib.git raylib
+    cd raylib
+    mkdir build && cd build
+    cmake -DBUILD_SHARED_LIBS=ON ..
+    make
+    sudo make install
+    sudo ldconfig
+
 Helpful functions:
 
 void DrawRectangle(int posX, int posY, int width, int height, Color color);    
