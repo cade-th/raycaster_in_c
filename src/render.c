@@ -1,7 +1,7 @@
-#include "render.h"
-#include "ui.h"
-#include "player.h"
-#include "state.h"
+#include "../include/render.h"
+#include "../include/ui.h"
+#include "../include/player.h"
+#include "../include/state.h"
 
 Renderer renderer_new() {
     Camera2D camera = {

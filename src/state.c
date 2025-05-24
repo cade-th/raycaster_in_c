@@ -1,7 +1,7 @@
-#include "state.h"
-#include "world.h"
-#include "render.h"
-#include "player.h"
+#include "../include/state.h"
+#include "../include/world.h"
+#include "../include/render.h"
+#include "../include/player.h"
 
 
 

@@ -1,5 +1,5 @@
-#include "world.h"
-#include "state.h"
+#include "../include/world.h"
+#include "../include/state.h"
 
 void render_world_temp(World *world) {  
     for (int i=0; i < world->map_size; i++) {

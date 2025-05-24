@@ -1,7 +1,7 @@
-#include "ui.h"
-#include "raylib.h"
-#include "state.h"
-#include "stdio.h"
+#include "../include/ui.h"
+#include "../include/raylib.h"
+#include "../include/state.h"
+#include "../include/stdio.h"
 
 UI ui_new() {
     UI ui = {

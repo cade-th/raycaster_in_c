@@ -1,12 +1,12 @@
 #include "raylib.h"
 #include <stdio.h>
-#include "math.h"
+#include <math.h>
 
-#include "world.h"
-#include "player.h"
-#include "render.h"
-#include "state.h"
-#include "ui.h"
+#include "../include/world.h"
+#include "../include/player.h"
+#include "../include/render.h"
+#include "../include/state.h"
+#include "../include/ui.h"
 
 //TODO:
 //1. Incorporate screen size into map draw

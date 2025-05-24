@@ -1,6 +1,6 @@
-#include "player.h"
-#include "world.h"
-#include "state.h"
+#include "../include/player.h"
+#include "../include/world.h"
+#include "../include/state.h"
 
 Player player_new() {
     Player player = {
